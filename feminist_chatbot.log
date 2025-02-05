@@ -1,0 +1,82 @@
+2025-02-05 19:32:20,371 - INFO - Feminist Chatbot logging initialized.
+2025-02-05 19:39:01,461 - ERROR - OpenAI API call failed
+Traceback (most recent call last):
+  File "/Users/violetajaguar/Documents/feminist_chatbot/main.py", line 222, in fallback_openai_response
+    gpt_response = openai.ChatCompletion.create(
+        model="gpt-4",
+    ...<2 lines>...
+        temperature=0.7
+    )
+  File "/opt/homebrew/lib/python3.13/site-packages/openai/lib/_old_api.py", line 39, in __call__
+    raise APIRemovedInV1(symbol=self._symbol)
+openai.lib._old_api.APIRemovedInV1: 
+
+You tried to access openai.ChatCompletion, but this is no longer supported in openai>=1.0.0 - see the README at https://github.com/openai/openai-python for the API.
+
+You can run `openai migrate` to automatically upgrade your codebase to use the 1.0.0 interface. 
+
+Alternatively, you can pin your installation to the old version, e.g. `pip install openai==0.28`
+
+A detailed migration guide is available here: https://github.com/openai/openai-python/discussions/742
+
+2025-02-05 19:39:23,229 - ERROR - OpenAI API call failed
+Traceback (most recent call last):
+  File "/Users/violetajaguar/Documents/feminist_chatbot/main.py", line 222, in fallback_openai_response
+    gpt_response = openai.ChatCompletion.create(
+        model="gpt-4",
+    ...<2 lines>...
+        temperature=0.7
+    )
+  File "/opt/homebrew/lib/python3.13/site-packages/openai/lib/_old_api.py", line 39, in __call__
+    raise APIRemovedInV1(symbol=self._symbol)
+openai.lib._old_api.APIRemovedInV1: 
+
+You tried to access openai.ChatCompletion, but this is no longer supported in openai>=1.0.0 - see the README at https://github.com/openai/openai-python for the API.
+
+You can run `openai migrate` to automatically upgrade your codebase to use the 1.0.0 interface. 
+
+Alternatively, you can pin your installation to the old version, e.g. `pip install openai==0.28`
+
+A detailed migration guide is available here: https://github.com/openai/openai-python/discussions/742
+
+2025-02-05 19:39:26,973 - ERROR - OpenAI API call failed
+Traceback (most recent call last):
+  File "/Users/violetajaguar/Documents/feminist_chatbot/main.py", line 222, in fallback_openai_response
+    gpt_response = openai.ChatCompletion.create(
+        model="gpt-4",
+    ...<2 lines>...
+        temperature=0.7
+    )
+  File "/opt/homebrew/lib/python3.13/site-packages/openai/lib/_old_api.py", line 39, in __call__
+    raise APIRemovedInV1(symbol=self._symbol)
+openai.lib._old_api.APIRemovedInV1: 
+
+You tried to access openai.ChatCompletion, but this is no longer supported in openai>=1.0.0 - see the README at https://github.com/openai/openai-python for the API.
+
+You can run `openai migrate` to automatically upgrade your codebase to use the 1.0.0 interface. 
+
+Alternatively, you can pin your installation to the old version, e.g. `pip install openai==0.28`
+
+A detailed migration guide is available here: https://github.com/openai/openai-python/discussions/742
+
+2025-02-05 19:40:15,003 - ERROR - OpenAI API call failed
+Traceback (most recent call last):
+  File "/Users/violetajaguar/Documents/feminist_chatbot/main.py", line 222, in fallback_openai_response
+    gpt_response = openai.ChatCompletion.create(
+        model="gpt-4",
+    ...<2 lines>...
+        temperature=0.7
+    )
+  File "/opt/homebrew/lib/python3.13/site-packages/openai/lib/_old_api.py", line 39, in __call__
+    raise APIRemovedInV1(symbol=self._symbol)
+openai.lib._old_api.APIRemovedInV1: 
+
+You tried to access openai.ChatCompletion, but this is no longer supported in openai>=1.0.0 - see the README at https://github.com/openai/openai-python for the API.
+
+You can run `openai migrate` to automatically upgrade your codebase to use the 1.0.0 interface. 
+
+Alternatively, you can pin your installation to the old version, e.g. `pip install openai==0.28`
+
+A detailed migration guide is available here: https://github.com/openai/openai-python/discussions/742
+
+2025-02-05 19:42:25,187 - INFO - Feminist Chatbot logging initialized.
