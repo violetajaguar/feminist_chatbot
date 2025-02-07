@@ -7,7 +7,9 @@ from datetime import datetime
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+import config
 
+OPENAI_API_KEY = config.OPENAI_API_KEY
 # Initialize Logging
 logging.basicConfig(
     level=logging.INFO,
@@ -31,11 +33,13 @@ app.add_middleware(
 )
 
 # Initialize OpenAI API key from environment variable
-openai.api_key = os.getenv("OPENAI_API_KEY")
+#openai.api_key = os.getenv("OPENAI_API_KEY")
+openai.api_key = config.OPENAI_API_KEY
 if not openai.api_key:
     raise Exception("OpenAI API Key is not set. Please set the OPENAI_API_KEY environment variable.")
 
 # Define the request model
+#client = openai.OpenAI(api_key=OPENAI_API_KEY)
 class ChatRequest(BaseModel):
     message: str
 
@@ -219,13 +223,15 @@ def fallback_openai_response(user_input):
         {"role": "user", "content": user_input}
     ]
     try:
+        #chat_completion = client.chat.completions.create
         gpt_response = openai.ChatCompletion.create(
             model="gpt-4",
             messages=messages,
             max_tokens=300,
             temperature=0.7
         )
-        return gpt_response.choices[0].message['content'].strip()
+        print(gpt_response)
+        return gpt_response['choices'][0]['message']['content'].strip()
     except Exception as e:
         logging.error("OpenAI API call failed", exc_info=True)
         return "Oops! I'm having trouble thinking right now. Please try again later."
