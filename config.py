@@ -1,0 +1,4 @@
+OPENAI_API_KEY = "sk-proj-FwqnyN_3CA9gWdguUqwoHVQdUX__JvFl4esKTtcCZ3UMoILS5FpcbOLoD_kU_lVMFsdyP3BBJ5T3BlbkFJDl" \
+                 "_dkg5kY14afvZBkTQf-6JXnXZYwZvdUThkGY6Cblo2i76DdO6nAdciwgx0M7x6q9Pul93W4A"
+
+DEEPSEEK_API_KEY = "sk-fec116ba3d7249f28435c06d5d08239d"
