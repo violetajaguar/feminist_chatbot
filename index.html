@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FeministBot</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            flex-direction: column;
+        }
+        #chat-container {
+            width: 400px;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1);
+        }
+        #chat-box {
+            height: 300px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+            background: #fafafa;
+        }
+        #user-input {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .button-container {
+            display: flex;
+            justify-content: space-between;
+        }
+        button {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            cursor: pointer;
+            border-radius: 5px;
+            font-size: 16px;
+            margin: 0 5px;
+        }
+        #openai-btn {
+            background-color: #007bff;
+            color: white;
+        }
+        #deepseek-btn {
+            background-color: #28a745;
+            color: white;
+        }
+        button:hover {
+            opacity: 0.8;
+        }
+    </style>
+</head>
+<body>
+    <div id="chat-container">
+        <div id="chat-box"></div>
+        <input type="text" id="user-input" placeholder="Type your message...">
+        <div class="button-container">
+            <button id="openai-btn">OpenAI</button>
+            <button id="deepseek-btn">DeepSeek</button>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById("openai-btn").addEventListener("click", function() {
+            sendMessage("openai");
+        });
+
+        document.getElementById("deepseek-btn").addEventListener("click", function() {
+            sendMessage("deepseek");
+        });
+
+        function sendMessage(apiChoice) {
+            const userInput = document.getElementById("user-input").value.trim();
+            if (!userInput) return;
+
+            document.getElementById("chat-box").innerHTML += `<p><strong>You:</strong> ${userInput}</p>`;
+
+            fetch("/chat", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ message: userInput, api: apiChoice })
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById("chat-box").innerHTML += `<p><strong>Bot:</strong> ${data.response}</p>`;
+            })
+            .catch(error => console.error("Error:", error));
+
+            document.getElementById("user-input").value = "";
+        }
+    </script>
+</body>
+</html>
