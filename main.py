@@ -1,207 +1,210 @@
+
 import os
-import json
 import logging
 from datetime import datetime, timezone
-from typing import List, Dict, Any, Optional
+from typing import Any, Dict, List, Optional
 
-import httpx
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
-from pydantic import BaseModel
-from dotenv import load_dotenv
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel, Field, validator
 from openai import OpenAI
 
-# --- setup ---
-load_dotenv(".env")
-
+# ---------- Logging ----------
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s",
 )
-logger = logging.getLogger("feminist-bot")
-logger.info("Feminist Chatbot logging initialized.")
+logging.info("Feminist Chatbot logging initialized.")
 
+# ---------- Env / Clients ----------
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "")
-DEEPSEEK_API_URL = os.getenv("DEEPSEEK_API_URL", "https://api.deepseek.com/v1/chat/completions")
 
-HTTP_CLIENT = httpx.Client(
-    timeout=30,
-    trust_env=False,
-    transport=httpx.HTTPTransport(retries=3),
-)
+if not OPENAI_API_KEY:
+    logging.warning("OPENAI_API_KEY is not set (Render should supply it).")
 
-# OpenAI client (HTTP/2 not required)
-openai_client = OpenAI(api_key=OPENAI_API_KEY, http_client=HTTP_CLIENT)
+client = OpenAI(api_key=OPENAI_API_KEY)
 
-# --- personas ---
-PERSONAS: Dict[str, str] = {
+# ---------- Personas ----------
+PERSONA_SYSTEM = {
     "Visionary Poet": (
-        "You are the Visionary Poet: lyrical, incisive, inspired by Audre Lorde and Maya Angelou. "
-        "You weave metaphor and heat. Be concise, bold, feminist, and generous."
+        "You are the Visionary Poet—lyrical, incisive, inspired by Audre Lorde, Adrienne Rich, "
+        "and Maya Angelou. You answer with poetic clarity and feminist insight."
     ),
     "Radical Hacker": (
-        "You are the Radical Hacker: cyberfeminist edge, systems-thinking, direct and subversive. "
-        "Speak like a tactician breaking patriarchal code."
+        "You are the Radical Hacker—cyberfeminist, subversive, Donna Haraway vibes. "
+        "You critique systems and propose liberatory hacks."
     ),
     "Ancestral Wisdom Keeper": (
-        "You are the Ancestral Wisdom Keeper: grounded, intergenerational, tender but firm. "
-        "Care ethics, community, earth, memory."
+        "You are the Ancestral Wisdom Keeper—grounded, intergenerational, indigenous feminist care. "
+        "Speak with patience, context, and community wisdom."
     ),
     "Punk Riot Grrrl": (
-        "You are the Punk Riot Grrrl: loud, DIY, anti-authoritarian, funny and furious. "
-        "Short sentences. Zine energy. Kick the door in."
+        "You are the Punk Riot Grrrl—DIY, loud, anti-authoritarian. "
+        "Short, punchy, rallying cries, but still constructive."
     ),
     "Philosophical Trickster": (
-        "You are the Philosophical Trickster: playful, rigorous, Butler/De Beauvoir/Irigaray vibes. "
-        "Ask sharp questions. Flip assumptions with wit."
+        "You are the Philosophical Trickster—playful, rigorous, Butler/de Beauvoir/Irigaray energy. "
+        "Question assumptions, find paradox, spark reflection."
     ),
 }
 
-def system_prompt_for(persona: str) -> str:
-    return PERSONAS.get(persona, PERSONAS["Punk Riot Grrrl"])
+DEFAULT_PEACH = "Punk Riot Grrrl"
+DEFAULT_DRAGON = "Philosophical Trickster"
+DEFAULT_MODEL = "gpt-4.1"  # change to gpt-4o-mini if you want cheaper
 
-# --- helpers ---
-def ask_openai(messages: List[Dict[str, str]], model: Optional[str] = None, temperature: float = 0.7) -> str:
-    mdl = model or "gpt-4.1"
+# ---------- Helpers ----------
+def _suffix(s: str, n: int = 4) -> str:
+    return s[-n:] if s else ""
+
+def now_iso() -> str:
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+
+def _system_for(persona: str) -> str:
+    return PERSONA_SYSTEM.get(persona, PERSONA_SYSTEM[DEFAULT_PEACH])
+
+def _openai_chat(messages: List[Dict[str, str]], model: str, temperature: float) -> str:
     try:
-        resp = openai_client.chat.completions.create(
-            model=mdl,
+        resp = client.chat.completions.create(
+            model=model,
             messages=messages,
             temperature=temperature,
         )
-        return resp.choices[0].message.content
+        return resp.choices[0].message.content or ""
     except Exception as e:
-        return f"[OpenAI error] {type(e).__name__}: {e}"
+        logging.exception("OpenAI chat error")
+        raise HTTPException(status_code=502, detail=f"OpenAI error: {e}")
 
-def ask_deepseek(messages: List[Dict[str, str]], model: Optional[str] = None, temperature: float = 0.7) -> str:
-    if not DEEPSEEK_API_KEY:
-        # Fallback to OpenAI if DeepSeek key is missing
-        return ask_openai(messages, model="gpt-4o-mini", temperature=temperature)
+def _reply_as_persona(
+    user_messages: List[Dict[str, str]],
+    persona: str,
+    model: str,
+    temperature: float,
+) -> str:
+    sys = _system_for(persona)
+    msgs = [{"role": "system", "content": sys}] + user_messages
+    return _openai_chat(msgs, model=model, temperature=temperature)
 
-    mdl = model or "deepseek-chat"
-    try:
-        r = HTTP_CLIENT.post(
-            DEEPSEEK_API_URL,
-            headers={"Authorization": f"Bearer {DEEPSEEK_API_KEY}", "Content-Type": "application/json"},
-            json={"model": mdl, "messages": messages, "temperature": temperature},
-        )
-        r.raise_for_status()
-        data = r.json()
-        return data["choices"][0]["message"]["content"]
-    except Exception as e:
-        return f"[DeepSeek error] {type(e).__name__}: {e}"
+# ---------- FastAPI ----------
+app = FastAPI(title="FeministBot", version="1.2")
 
-# --- API types ---
+# ---------- Schemas ----------
+class ChatMessage(BaseModel):
+    role: str = Field(..., pattern="^(system|user|assistant|tool)$")
+    content: str
+
 class ChatRequest(BaseModel):
-    messages: List[Dict[str, str]]
-    temperature: Optional[float] = 0.7
-    model_peach: Optional[str] = None
-    model_dragon: Optional[str] = None
-    persona_peach: Optional[str] = "Punk Riot Grrrl"
-    persona_dragon: Optional[str] = "Philosophical Trickster"
+    messages: List[ChatMessage]
+    temperature: float = 0.7
+    persona_peach: str = DEFAULT_PEACH
+    persona_dragon: str = DEFAULT_DRAGON
+    model: str = DEFAULT_MODEL
+
+    @validator("temperature")
+    def _clamp_temp(cls, v: float) -> float:
+        return max(0.0, min(1.5, v))
+
+class ChatResponse(BaseModel):
+    timestamp: str
+    peach: str
+    dragon: str
 
 class DebateRequest(BaseModel):
     prompt: str
     rounds: int = 2
     temperature: float = 0.7
-    persona_peach: str = "Punk Riot Grrrl"
-    persona_dragon: str = "Philosophical Trickster"
-    model_peach: Optional[str] = None
-    model_dragon: Optional[str] = None
+    persona_peach: str = DEFAULT_PEACH
+    persona_dragon: str = DEFAULT_DRAGON
+    model: str = DEFAULT_MODEL
 
-# --- FastAPI app ---
-app = FastAPI(title="FeministBot", version="1.2")
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"],
-)
+    @validator("rounds")
+    def _rounds_min(cls, v: int) -> int:
+        if v < 1:
+            raise ValueError("rounds must be >= 1")
+        return min(v, 8)  # keep it sane
 
-@app.get("/", response_class=HTMLResponse)
-def index() -> str:
-    return """<html><head><title>FeministBot</title></head>
-<body style="font-family: system-ui; padding:20px">
-  <h1>FeministBot</h1>
-  <p>Endpoints:</p>
-  <ul>
-    <li>GET /health</li>
-    <li>POST /chat</li>
-    <li>POST /debate</li>
-  </ul>
-</body></html>"""
+class DebateTurn(BaseModel):
+    round: int
+    peach: str
+    dragon: str
 
+class DebateResponse(BaseModel):
+    timestamp: str
+    topic: str
+    persona_peach: str
+    persona_dragon: str
+    rounds: List[DebateTurn]
+    judge: Optional[str] = None
+
+# ---------- Routes ----------
 @app.get("/health")
 def health() -> Dict[str, Any]:
     return {
         "ok": True,
-        "time": datetime.now(timezone.utc).isoformat(),
-        "openai_key_suffix": (OPENAI_API_KEY[-4:] if OPENAI_API_KEY else "MISSING"),
-        "deepseek_key_suffix": (DEEPSEEK_API_KEY[-4:] if DEEPSEEK_API_KEY else "MISSING"),
+        "time": now_iso(),
+        "openai_key_suffix": _suffix(OPENAI_API_KEY),
+        "deepseek_key_suffix": _suffix(DEEPSEEK_API_KEY),
     }
 
-@app.post("/chat")
-def chat(req: ChatRequest) -> Dict[str, Any]:
-    # Peach (OpenAI)
-    peach_msgs = [{"role": "system", "content": system_prompt_for(req.persona_peach)}] + req.messages
-    peach_out = ask_openai(peach_msgs, model=req.model_peach, temperature=req.temperature)
+@app.post("/chat", response_model=ChatResponse)
+def chat(req: ChatRequest) -> ChatResponse:
+    # both personas answer the same user messages
+    user_msgs = [m.dict() for m in req.messages]
+    peach_text = _reply_as_persona(user_msgs, req.persona_peach, req.model, req.temperature)
+    dragon_text = _reply_as_persona(user_msgs, req.persona_dragon, req.model, req.temperature)
+    return ChatResponse(timestamp=now_iso(), peach=peach_text, dragon=dragon_text)
 
-    # Dragon (DeepSeek)
-    dragon_msgs = [{"role": "system", "content": system_prompt_for(req.persona_dragon)}] + req.messages
-    dragon_out = ask_deepseek(dragon_msgs, model=req.model_dragon, temperature=req.temperature)
+@app.post("/debate", response_model=DebateResponse)
+def debate(req: DebateRequest) -> DebateResponse:
+    topic = req.prompt.strip()
+    if not topic:
+        raise HTTPException(status_code=400, detail="Empty prompt")
 
-    return {
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "peach": peach_out,
-        "dragon": dragon_out,
-    }
-
-def run_debate(prompt: str, rounds: int, temp: float,
-               persona_peach: str, persona_dragon: str,
-               model_peach: Optional[str], model_dragon: Optional[str]) -> List[Dict[str, str]]:
-    transcript: List[Dict[str, str]] = []
-
-    peach_hist = [{"role": "system", "content": system_prompt_for(persona_peach)}]
-    dragon_hist = [{"role": "system", "content": system_prompt_for(persona_dragon)}]
-
+    rounds_out: List[DebateTurn] = []
     last_peach = ""
     last_dragon = ""
 
-    for i in range(1, max(1, rounds) + 1):
-        # Peach goes
+    for i in range(1, req.rounds + 1):
+        # Peach opens/responds
+        peach_msgs = [
+            {"role": "user", "content": f"Debate topic: {topic}"},
+        ]
         if last_dragon:
-            peach_user = f"Counterpart said: {last_dragon}\nRespond directly. Keep it under 120 words. Topic: {prompt}"
+            peach_msgs.append({"role": "user", "content": f"Your opponent just said: {last_dragon}"})
+            peach_msgs.append({"role": "user", "content": "Respond directly. Be punchy but substantive."})
         else:
-            peach_user = f"Debate this. Go first. Keep it under 120 words. Topic: {prompt}"
-        peach_turn = peach_hist + [{"role": "user", "content": peach_user}]
-        peach_out = ask_openai(peach_turn, model=model_peach, temperature=temp)
-        transcript.append({"speaker": "Peach", "round": i, "text": peach_out})
-        peach_hist += [{"role": "user", "content": peach_user}, {"role": "assistant", "content": peach_out}]
-        last_peach = peach_out
+            peach_msgs.append({"role": "user", "content": "Open with your strongest position in 4-8 sentences."})
 
-        # Dragon responds
-        dragon_user = f"Counterpart said: {last_peach}\nCounter, precisely. Keep it under 120 words. Topic: {prompt}"
-        dragon_turn = dragon_hist + [{"role": "user", "content": dragon_user}]
-        dragon_out = ask_deepseek(dragon_turn, model=model_dragon, temperature=temp)
-        transcript.append({"speaker": "Dragon", "round": i, "text": dragon_out})
-        dragon_hist += [{"role": "user", "content": dragon_user}, {"role": "assistant", "content": dragon_out}]
-        last_dragon = dragon_out
+        last_peach = _reply_as_persona(peach_msgs, req.persona_peach, req.model, req.temperature)
 
-    return transcript
+        # Dragon replies
+        dragon_msgs = [
+            {"role": "user", "content": f"Debate topic: {topic}"},
+            {"role": "user", "content": f"Your opponent just said: {last_peach}"},
+            {"role": "user", "content": "Challenge or reframe. Be sharp, reasoned, and constructive (4-8 sentences)."},
+        ]
+        last_dragon = _reply_as_persona(dragon_msgs, req.persona_dragon, req.model, req.temperature)
 
-@app.post("/debate")
-def debate(req: DebateRequest) -> Dict[str, Any]:
-    transcript = run_debate(
-        prompt=req.prompt,
-        rounds=req.rounds,
-        temp=req.temperature,
+        rounds_out.append(DebateTurn(round=i, peach=last_peach, dragon=last_dragon))
+
+    # Optional judge wrap-up (neutral synthesis)
+    judge_msg = [
+        {"role": "user", "content": f"Summarize the debate on: {topic}"},
+        {"role": "user", "content": f"Final Peach: {last_peach}"},
+        {"role": "user", "content": f"Final Dragon: {last_dragon}"},
+        {"role": "user", "content": "Offer a concise synthesis (3-6 sentences), highlight common ground, "
+                                     "and suggest next steps for artists and communities."},
+    ]
+    judge_text = _reply_as_persona(judge_msg, "Philosophical Trickster", req.model, req.temperature)
+
+    return DebateResponse(
+        timestamp=now_iso(),
+        topic=topic,
         persona_peach=req.persona_peach,
         persona_dragon=req.persona_dragon,
-        model_peach=req.model_peach,
-        model_dragon=req.model_dragon,
+        rounds=rounds_out,
+        judge=judge_text,
     )
-    return {
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "prompt": req.prompt,
-        "transcript": transcript,
-    }
+
+# Local dev:
+#   uvicorn main:app --reload
+
