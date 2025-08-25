@@ -17,3 +17,10 @@ __pycache__/
 .venv/
 .env
 peach_client.py
+
+__pycache__/
+*.pyc
+.DS_Store
+.venv/
+.env
+peach_client.py
