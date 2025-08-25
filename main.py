@@ -342,8 +342,7 @@ HTML_INDEX = r"""<!doctype html>
     </div>
 
     <div class="blurb">
-      <b>About bias (in a tiny Miranda July mood):</b> Peach is powered by OpenAI’s ChatGPT and Dragon by DeepSeek. They grew up with different parents and favorite TV shows. They sometimes disagree about what’s “obvious,” which is perfect, because you can watch them change each other’s minds—like two people sharing headphones on a bus, nodding at different parts of the same song.
-    </div>
+      <b>About bias :</b> Peach runs on OpenAI's ChatGPT, while Dragon is built on DeepSeek, raised by different digital families with distinct worldviews. When they clash over what seems "self-evident," something happens: they actually listen to each other.
 
     <!-- FRUITS -->
     <section class="fruit-grid">
